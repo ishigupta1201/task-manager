@@ -1,23 +1,47 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# production
-/build
-
-# misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
+# Node.js
+node_modules/
+.env # DO NOT commit environment variables directly
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
+.pnpm-store/
+*.tgz
+*.log
+
+# Build artifacts
+build/ # React build output
+dist/
+.next/ # Next.js specific (if you were using it)
+out/ # Exported static sites
+
+# Editor/IDE specific files
+.vscode/ # VS Code settings (optional, you might want to share some)
+.idea/ # IntelliJ IDEA
+*.sublime-project
+*.sublime-workspace
+.DS_Store # macOS specific
+Thumbs.db # Windows specific
+
+# Uploaded files (backend)
+# This directory is for files uploaded by users. It should not be version controlled.
+uploads/
+
+# Test reports
+coverage/
+
+# Docker build artifacts
+.dockerignore # This file itself should be version controlled, but its effects are to ignore other files.
+# For Docker, typically you'd put `node_modules` inside .dockerignore for the build context
+# but since we COPY package.json and npm install inside the Dockerfile, and then COPY the rest,
+# node_modules on the host is already ignored by Docker's caching.
+# If you used local volumes that mount node_modules, you might need specific .dockerignore rules.
+
+# Frontend specific (already covered by node_modules and build/)
+# If you have other frontend specific things not already caught:
+# frontend/node_modules/
+# frontend/build/
+
+# Backend specific (already covered by node_modules and uploads/)
+# If you have other backend specific things not already caught:
+# backend/node_modules/

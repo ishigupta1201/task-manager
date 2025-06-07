@@ -1,0 +1,34 @@
+# Use the official Node.js 18 (Alpine variant for smaller image size) as the base image
+FROM node:18-alpine
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy package.json and package-lock.json from the backend directory
+# This step is done separately to leverage Docker's layer caching.
+# If only package.json/lock changes, npm install runs. If only source changes, npm install cache is used.
+COPY backend/package.json backend/package-lock.json ./
+
+# Install backend dependencies
+# Use --force to potentially bypass some peer dependency issues, common in development setup.
+# In a production setup, you'd address peer dependency warnings more strictly.
+RUN npm install --force
+
+# Copy the rest of the backend application code
+# This includes all your controllers, models, routes, middleware, config, and services.
+COPY backend/ ./
+
+# Create the 'uploads' directory inside the container
+# This is where Multer will store uploaded files.
+RUN mkdir -p uploads
+
+# Expose the port the backend server listens on.
+# This port (5000) is defined in your backend/.env and app.js.
+EXPOSE 5000
+
+# Command to start the Node.js application.
+# `npm start` should be defined in your backend/package.json scripts.
+# For production, you typically use `node server.js` or `npm start`.
+# For development with nodemon, you might use `npm run dev` here, but for Docker builds,
+# it's usually the production command.
+CMD ["npm", "start"]

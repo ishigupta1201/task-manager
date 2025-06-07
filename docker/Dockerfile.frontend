@@ -1,0 +1,45 @@
+# Stage 1: Build the React application
+# Use a Node.js image to build the React app
+FROM node:18-alpine as builder
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy package.json and package-lock.json from the frontend directory
+# This step is done separately to leverage Docker's layer caching.
+# If only package.json/lock changes, npm install runs. If only source changes, npm install cache is used.
+COPY frontend/package.json frontend/package-lock.json ./
+
+# Install frontend dependencies
+# Use --force to potentially bypass some peer dependency issues, common in development setup
+# In a production setup, you'd address peer dependency warnings more strictly.
+RUN npm install --force
+
+# Copy the rest of the frontend application code
+COPY frontend/ ./
+
+# Build the React app for production. This creates the 'build' folder.
+# The 'build' script is defined in your frontend/package.json.
+RUN npm run build
+
+# Stage 2: Serve the React application with Nginx
+# Use a lightweight Nginx image
+FROM nginx:alpine
+
+# Remove default Nginx configuration
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy your custom Nginx configuration file
+# This file defines how Nginx should serve your React app.
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy the built React app from the builder stage to Nginx's serving directory
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Expose the port Nginx will listen on.
+# This port (3000) is the one your frontend will be accessible through.
+EXPOSE 3000
+
+# Command to start Nginx in the foreground (daemon off)
+# This is required for Docker containers to keep the container running.
+CMD ["nginx", "-g", "daemon off;"]

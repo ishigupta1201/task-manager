@@ -1,0 +1,98 @@
+# docker/docker-compose.yml
+version: '3.8' # Specify the Docker Compose file format version
+
+services:
+  # MongoDB Database Service
+  mongodb:
+    image: mongo:latest # Use the latest official MongoDB image
+    container_name: mongodb # Assign a fixed name to the container
+    ports:
+      - "27017:27017" # Map container port 27017 to host port 27017
+    volumes:
+      - mongodb_data:/data/db # Persist MongoDB data to a named volume
+      - ./backend/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro # Optional: For initial data/user setup
+    environment:
+      # Optional: Set MongoDB root user credentials for initial setup
+      # These are used by mongo-init.js if it exists, or just for direct access
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: adminpassword
+      MONGO_INITDB_DATABASE: taskmanager # Set the default database name
+    networks:
+      - task-manager-network # Connect to the custom network
+
+  # Node.js Backend Service
+  backend:
+    build:
+      context: . # Build context is the root of the project (where docker-compose.yml is)
+      dockerfile: docker/Dockerfile.backend # Path to your backend Dockerfile
+    container_name: backend # Assign a fixed name to the container
+    ports:
+      - "5000:5000" # Map container port 5000 to host port 5000
+    environment:
+      # Pass environment variables from the host's .env file to the container.
+      # These must be defined in your backend/.env file.
+      MONGO_URI: mongodb://mongodb:27017/taskmanager # Connect to the MongoDB service by its name
+      JWT_SECRET: ${JWT_SECRET} # Read from host's .env (backend/.env)
+      PORT: 5000 # Keep consistent with app.js
+      FILE_UPLOAD_PATH: /app/uploads # Path inside the container for uploads
+      NODE_ENV: development # Set environment for Node.js
+      FRONTEND_URL: http://localhost:3000 # For CORS origin in backend
+      # Rate Limiting variables from host's .env
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE} # Ensure this is read by uploadMiddleware
+
+      # AWS S3 (Uncomment and configure if using S3)
+      # AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      # AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      # AWS_BUCKET_NAME: ${AWS_BUCKET_NAME}
+      # AWS_REGION: ${AWS_REGION}
+    volumes:
+      # Mount the local backend code into the container for live reloading during development.
+      # This means changes in your local backend files will reflect inside the container.
+      - ./backend:/app
+      # Important: Exclude node_modules from host mount to prevent issues with different OS architectures
+      - /app/node_modules
+      # Mount the uploads directory to persist uploaded files on the host machine
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - mongodb # Backend service depends on MongoDB starting first
+    networks:
+      - task-manager-network # Connect to the custom network
+    command: npm run dev # Use `npm run dev` to start with nodemon for hot-reloading (assuming in backend/package.json)
+    # For production, you'd typically use:
+    # command: npm start
+
+  # React Frontend Service
+  frontend:
+    build:
+      context: . # Build context is the root of the project
+      dockerfile: docker/Dockerfile.frontend # Path to your frontend Dockerfile
+    container_name: frontend # Assign a fixed name to the container
+    ports:
+      - "3000:3000" # Map container port 3000 to host port 3000
+    environment:
+      # Environment variables for the React app.
+      # REACT_APP_API_BASE_URL must point to the host machine's access point for the backend.
+      REACT_APP_API_BASE_URL: http://localhost:5000/api
+    depends_on:
+      - backend # Frontend depends on the backend (optional, but good for ordering)
+    networks:
+      - task-manager-network # Connect to the custom network
+    # For hot-reloading during development with Nginx, you'd mount a volume.
+    # However, for a production-like build (which Dockerfile.frontend does),
+    # the build is copied into Nginx, so no volume is needed here.
+    # If you wanted development with hot-reloading and create-react-app dev server:
+    # command: npm start
+    # volumes:
+    #   - ./frontend:/app
+    #   - /app/node_modules
+
+# Define named volumes for data persistence
+volumes:
+  mongodb_data: # Data volume for MongoDB
+
+# Define custom bridge network for inter-service communication
+networks:
+  task-manager-network:
+    driver: bridge # Use the default bridge driver
